@@ -21,12 +21,13 @@ using namespace std;
 
 /*Define Global Variables*/
 pid_t   childpid;
-timeval t1, t2;
+timeval t1, t2, rt1, rt2;
 int numtests;
-double elapsedTime;
-double totalTime= 0;
-double minTime = 0;
-double maxTime = 0;
+double elapsedTime = 0,
+	   totalTripTime = 0,
+	   rtTime = 0,
+	   minTime = 0,
+	   maxTime = 0;
 
 void sigusr1_handler(int sig) 
 {	
@@ -49,7 +50,8 @@ void printResults(int childpid,
                   int gid, 
 				  double min, 
 			      double max, 
-                  double total)
+                  double total,
+				  double elapsed)
 {
 	(childpid == 0)?printf("Child"):printf("Parent");
 	printf("'s Results for Pipe IPC mechanisms\n");
@@ -72,9 +74,8 @@ int main(int argc, char **argv)
 	//byte size messages to be passed through pipes	
 	char    childmsg[] = "1";
 	char    parentmsg[] = "2";
-	char    quitmsg[] = "q";
-    
-	char readbuffer[1];
+	char    quitmsg[] = "q";   	
+	char 	readbuffer[2];
 	// pipe initialization
 	pipe(fd1);
 	pipe(fd2);
@@ -123,65 +124,72 @@ int main(int argc, char **argv)
 		}
 		if(childpid != 0)
 		{	
+			gettimeofday(&rt1, NULL);
+			write(fd2[1], parentmsg, strlen(readbuffer)+1);
 			while(currentTest < numtests)
 			{
-				if(currentTest == 2)
-					write(fd2[1], quitmsg, 2);
-				printf("Parent test %d\n", currentTest);
-				gettimeofday(&t1, NULL); 
-				//printf("Child sending message...\n");
-				write(fd2[1], parentmsg, 2);
-				nbytes = read(fd1[0], readbuffer, 1);	
-				//printf("Parent received msg: %s\n", readbuffer);
-				currentTest++;
+				nbytes = read(fd1[0], readbuffer, sizeof(readbuffer));
+				if(strcmp(readbuffer, childmsg)==0)
+				{
+					gettimeofday(&rt2, NULL);
+					memset(readbuffer,0,strlen(readbuffer));
+					rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
+					rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
+					totalTripTime += rtTime;
+					if(rtTime > maxTime)
+						maxTime = rtTime;
+					if(rtTime < minTime || minTime == 0)
+						minTime = rtTime;
+					currentTest++;						
+					gettimeofday(&rt1, NULL);
+     				write(fd2[1], parentmsg, strlen(readbuffer)+1);
+				}
 			}
-			printf("QUITTING\n");
 			write(fd2[1], quitmsg, 2);
 		}
 		else
 		{
+			gettimeofday(&rt1, NULL);
 			while(true)
 			{
-				printf("Child test %d\n", currentTest);
-				nbytes = read(fd2[0], readbuffer, 1);
-				printf("readbuffer: %s\n",readbuffer);				
 				if(strcmp(readbuffer, quitmsg)==0)
 				{
-					printf("quitmsg received\n");
+					printf("QUITTING\n");
 					break;
 				}
-				//printf("Child received msg: %s\n", readbuffer);
-				gettimeofday(&t1, NULL); 
-				//printf("Child sending message...\n");
-				write(fd1[1], childmsg, 2);
-				currentTest++;
+				nbytes = read(fd2[0], readbuffer, sizeof(readbuffer));
+				if(strcmp(readbuffer, parentmsg)==0)
+				{
+					printf("check\n");
+					gettimeofday(&rt2, NULL);
+					memset(readbuffer,0,strlen(readbuffer));
+					rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
+					rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
+					totalTripTime += rtTime;
+					if(rtTime > maxTime)
+						maxTime = rtTime;
+					if(rtTime < minTime || minTime == 0)
+						minTime = rtTime;
+					gettimeofday(&rt1, NULL);
+					write(fd1[1], childmsg, strlen(readbuffer)+1);
+				}
 			}
 		}		
-		printf("END\n");
 		// stop timer
 		gettimeofday(&t2, NULL);
 		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-		//printf("Elapsed Time %f\n", elapsedTime);
-		totalTime += elapsedTime;
-		if(elapsedTime > maxTime)
-			maxTime = elapsedTime;
-		if(elapsedTime < minTime || minTime == 0)
-			minTime = elapsedTime;
-			
-		//printResults(childpid, getpid(), getgid(), minTime, maxTime, totalTime);
+		printResults(childpid, getpid(), getgid(), minTime, maxTime, totalTripTime, elapsedTime);
+		exit(0);	
 	}
 
 
 	if(strcmp(argv[1],"-s")==0)
 	{
-		//code for benchmarking signals over numtests
-		
-		
+		//code for benchmarking signals over numtests		
 		// stop timer
 		gettimeofday(&t2, NULL);
-
 		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
