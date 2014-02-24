@@ -28,20 +28,28 @@ double elapsedTime = 0,
 	   rtTime = 0,
 	   minTime = 0,
 	   maxTime = 0;
+bool looping;
 
 void sigusr1_handler(int sig) 
 {	
-	
+	printf("SIGUSR 1 received by prc %d\n", getpid());
+	printf("%d sending SIGUSR 2 to %d\n", getpid(), getppid());
+	kill(getppid(), SIGUSR2);
 }
 
 void sigusr2_handler(int sig) 
 { 
-	
+	gettimeofday(&rt2, NULL);
+	printf("SIGUSR 2 recieved by prc %d\n", getpid());
+	rtTime = (rt2.tv_sec - rt1.tv_sec) * 1000.0;
+	rtTime += (rt2.tv_usec - rt2.tv_usec)/1000.0;
+	printf("RT time: %f\n", rtTime);
 }
 
 void sigint_handler(int sig)
 {
-	
+	printf("Proc %d received SIGINT from proc %d...quitting\n", getpid(), getppid());
+	looping = false;
 }
 
 // printing helper routine
@@ -178,14 +186,45 @@ int main(int argc, char **argv)
 		gettimeofday(&t2, NULL);
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-		printResults(childpid, getpid(), getgid(), minTime, maxTime, totalTripTime, elapsedTime);
+		printResults(childpid, 
+					 getpid(), 
+					 getgid(), 
+					 minTime, 
+					 maxTime, 
+					 totalTripTime, 
+					 elapsedTime);
 		exit(0);	
 	}
 
 
 	if(strcmp(argv[1],"-s")==0)
 	{
-		printf(":D\n");
+		if ((childpid = fork()) == -1)
+		{
+			perror("fork");
+			exit(1);
+		}
+		if (childpid == 0)
+		{
+			while (looping)
+			{
+				printf("c\n");
+				sleep(1);
+			}
+		}
+		else
+		{
+			int currentTest = 0;
+			while (currentTest < numtests)
+			{
+				printf("testing...\n");
+				currentTest++;
+			}
+			gettimeofday(&rt1, NULL);
+			printf("sending interrupt signal\n");
+			kill(childpid, SIGINT);
+			wait(0);
+		}
 		//code for benchmarking signals over numtests		
 		// stop timer
 		gettimeofday(&t2, NULL);
@@ -193,6 +232,7 @@ int main(int argc, char **argv)
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
 		printf("Elapsed Time %f\n", elapsedTime);
+		exit(0);
 	}
 }
   
