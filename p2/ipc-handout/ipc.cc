@@ -91,7 +91,7 @@ int main(int argc, char **argv)
     Signal(SIGINT, sigint_handler);
     
     //Default Value of Num Tests
-    numtests=10;
+    numtests=10000;
     //Determine the number of messages was passed in from command line arguments
     //Replace default numtests w/ the commandline argument if applicable 
     if(argc<2)
@@ -122,8 +122,30 @@ int main(int argc, char **argv)
 			close(fd1[0]); // Child writes to fd1
 			close(fd2[1]); // Child reads from fd2
 		}
-		if(childpid != 0)
+		if(childpid == 0)
 		{	
+			gettimeofday(&rt1, NULL);
+			while(strcmp(readbuffer, quitmsg) != 0)
+			{
+				nbytes = read(fd2[0], readbuffer, sizeof(readbuffer));
+				if(strcmp(readbuffer, parentmsg)==0)
+				{
+					gettimeofday(&rt2, NULL);
+					memset(readbuffer,0,strlen(readbuffer));
+					rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
+					rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
+					totalTripTime += rtTime;
+					if(rtTime > maxTime)
+						maxTime = rtTime;
+					if(rtTime < minTime || minTime == 0)
+						minTime = rtTime;
+					gettimeofday(&rt1, NULL);
+					write(fd1[1], childmsg, strlen(readbuffer)+1);
+				}
+			}
+		}
+		else
+		{
 			gettimeofday(&rt1, NULL);
 			write(fd2[1], parentmsg, strlen(readbuffer)+1);
 			while(currentTest < numtests)
@@ -142,42 +164,15 @@ int main(int argc, char **argv)
 						minTime = rtTime;
 					currentTest++;						
 					gettimeofday(&rt1, NULL);
-     				write(fd2[1], parentmsg, strlen(readbuffer)+1);
+					if(currentTest == numtests)
+	     				write(fd2[1], quitmsg, strlen(readbuffer)+1);
+					else
+     					write(fd2[1], parentmsg, strlen(readbuffer)+1);
 				}
 			}
-			write(fd2[1], quitmsg, 2);
-		}
-		else
-		{
-			gettimeofday(&rt1, NULL);
-			while(true)
-			{
-				if(strcmp(readbuffer, quitmsg)==0)
-				{
-					printf("QUITTING\n");
-					break;
-				}
-				nbytes = read(fd2[0], readbuffer, sizeof(readbuffer));
-				if(strcmp(readbuffer, parentmsg)==0)
-				{
-					printf("check\n");
-					gettimeofday(&rt2, NULL);
-					memset(readbuffer,0,strlen(readbuffer));
-					rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
-					rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
-					totalTripTime += rtTime;
-					if(rtTime > maxTime)
-						maxTime = rtTime;
-					if(rtTime < minTime || minTime == 0)
-						minTime = rtTime;
-					gettimeofday(&rt1, NULL);
-					write(fd1[1], childmsg, strlen(readbuffer)+1);
-				}
-			}
-		}		
-		// stop timer
+			wait(0);
+		}	
 		gettimeofday(&t2, NULL);
-		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
 		printResults(childpid, getpid(), getgid(), minTime, maxTime, totalTripTime, elapsedTime);
