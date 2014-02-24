@@ -32,18 +32,14 @@ bool looping;
 
 void sigusr1_handler(int sig) 
 {	
-	printf("SIGUSR 1 received by prc %d\n", getpid());
-	printf("%d sending SIGUSR 2 to %d\n", getpid(), getppid());
+	printf("      SIGUSR1 received by prc %d\n", getpid());
+	printf("         %d sending SIGUSR 2 to %d\n", getpid(), getppid());
 	kill(getppid(), SIGUSR2);
 }
 
 void sigusr2_handler(int sig) 
 { 
-	gettimeofday(&rt2, NULL);
-	printf("SIGUSR 2 recieved by prc %d\n", getpid());
-	rtTime = (rt2.tv_sec - rt1.tv_sec) * 1000.0;
-	rtTime += (rt2.tv_usec - rt2.tv_usec)/1000.0;
-	printf("RT time: %f\n", rtTime);
+	printf("            SIGUSR2 received by prc %d\n", getpid());
 }
 
 void sigint_handler(int sig)
@@ -62,7 +58,7 @@ void printResults(int childpid,
 				  double elapsed)
 {
 	(childpid == 0)?printf("Child"):printf("Parent");
-	printf("'s Results for Pipe IPC mechanisms\n");
+	printf("'s Results for String IPC mechanisms\n");
 	printf("Process ID is %d, Group ID is %d\n", pid, gid);
 	printf("Round trip times\n");
 	printf("Average %f\n", total/numtests);
@@ -186,6 +182,7 @@ int main(int argc, char **argv)
 		gettimeofday(&t2, NULL);
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
+		char testType[] = "Signal";
 		printResults(childpid, 
 					 getpid(), 
 					 getgid(), 
@@ -208,8 +205,7 @@ int main(int argc, char **argv)
 		{
 			while (looping)
 			{
-				printf("c\n");
-				sleep(1);
+				printf("child here\n");
 			}
 		}
 		else
@@ -217,11 +213,23 @@ int main(int argc, char **argv)
 			int currentTest = 0;
 			while (currentTest < numtests)
 			{
-				printf("testing...\n");
+				printf("Starting timer for proc: %d\n", getpid());
+				gettimeofday(&rt1, NULL);
+				printf("   Sending SIGUSR1 to child\n");
+				kill(childpid, SIGUSR1);
+				pause();
+				gettimeofday(&rt2, NULL);
+				printf("               Stopped timer for prc %d\n", getpid());
+				rtTime = (rt2.tv_sec - rt1.tv_sec) * 1000.0;
+				rtTime += (rt2.tv_usec - rt2.tv_usec) / 1000.0;
+				//printf("                  RT time: %f\n", (double)(rt2.tv_sec) - (double)(rt1.tv_sec));
+				printf("T2: %f\n", (double)rt2.tv_usec);
+				printf("T1: %f\n", (double)rt1.tv_usec);
+				printf("                     [Test complete]\n");
 				currentTest++;
-			}
-			gettimeofday(&rt1, NULL);
-			printf("sending interrupt signal\n");
+			}			
+						
+			// When all is said and done...
 			kill(childpid, SIGINT);
 			wait(0);
 		}
@@ -235,14 +243,3 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 }
-  
-
-
-
-
-
-
-
-
-
-

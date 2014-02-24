@@ -48,6 +48,3 @@ handler_t *Signal(int signum, handler_t *handler)
 	unix_error("Signal error");
     return (old_action.sa_handler);
 }
-
-
-
