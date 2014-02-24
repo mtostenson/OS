@@ -91,7 +91,10 @@ int main(int argc, char **argv)
     Signal(SIGINT, sigint_handler);
     
     //Default Value of Num Tests
-    numtests=10000;
+	if(argc > 2)
+		numtests = atoi(argv[2]);
+	else
+	    numtests=10000;
     //Determine the number of messages was passed in from command line arguments
     //Replace default numtests w/ the commandline argument if applicable 
     if(argc<2)
@@ -182,6 +185,7 @@ int main(int argc, char **argv)
 
 	if(strcmp(argv[1],"-s")==0)
 	{
+		printf(":D\n");
 		//code for benchmarking signals over numtests		
 		// stop timer
 		gettimeofday(&t2, NULL);
