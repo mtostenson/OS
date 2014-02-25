@@ -1,5 +1,6 @@
 // 
 // Michael Tostenson 
+// Operating Systems: Project 2
 //
 
 using namespace std;
@@ -24,8 +25,8 @@ pid_t   childpid;
 timeval t1, t2, rt1, rt2;
 int numtests;
 double elapsedTime = 0,
-	   totalTripTime,
-	   rtTime,
+	   totalTripTime = 0,
+	   rtTime = 0,
 	   minTime = 0,
 	   maxTime = 0;
 bool looping = true;
@@ -71,10 +72,13 @@ void printResults(int childpid,
                   int gid, 
 				  double min, 
 			      double max, 
-				  double elapsed)
+				  double elapsed,
+				  bool testType)
 {
 	(childpid == 0)?printf("Child"):printf("Parent");
-	printf("'s Results for String IPC mechanisms\n");
+	printf("'s Results for ");
+	testType?printf("Symbol"):printf("Pipe");
+	printf(" IPC mechanisms\n");
 	printf("Process ID is %d, Group ID is %d\n", pid, gid);
 	printf("Round trip times\n");
 	printf("Average %f\n", elapsed/numtests);
@@ -94,7 +98,7 @@ int main(int argc, char **argv)
 	//byte size messages to be passed through pipes	
 	char    childmsg[] = "1";
 	char    parentmsg[] = "2";
-	char    quitmsg[] = "q";   	
+	char    quitmsg[] = "q";
 	char 	readbuffer[2];
 	// pipe initialization
 	pipe(fd1);
@@ -203,14 +207,14 @@ int main(int argc, char **argv)
 					 getgid(), 
 					 minTime, 
 					 maxTime, 
-					 elapsedTime);
+					 elapsedTime,
+					 false);
 		exit(0);	
 	}
 
 	if(strcmp(argv[1],"-s")==0)
 	{
 		int currentTest = 0;
-		printf("Beginning signals test...\n");
 		if ((childpid = fork()) == -1)
 		{
 			perror("fork");
@@ -227,6 +231,7 @@ int main(int argc, char **argv)
 		}
 		if(childpid == 0)
 		{
+			maxTime = 0;
 			gettimeofday(&rt1, NULL);
 			while(looping)
 			{
@@ -235,6 +240,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
+			maxTime = 0;
 			gettimeofday(&rt1, NULL);
 			kill(childpid, SIGUSR1);
 			while(currentTest < numtests)
@@ -256,7 +262,8 @@ int main(int argc, char **argv)
 					 getgid(),
 					 minTime,
 					 maxTime,
-					 elapsedTime);
+					 elapsedTime,
+					 true);
 		exit(0);
 	}
 }
