@@ -34,10 +34,10 @@ sigset_t sigmask;
 
 void sigusr1_handler(int sig) // Child catches this
 {
-	gettimeofday(&rt2, NULL);
-	rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
-	rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
-	totalTripTime += rtTime;
+    gettimeofday(&rt2, NULL);
+    rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
+    rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
+    totalTripTime += rtTime;
     if(rtTime > maxTime)
         maxTime = rtTime;
     if(rtTime < minTime || minTime == 0)
@@ -68,12 +68,12 @@ void sigint_handler(int sig)
 
 // printing helper routine
 void printResults(int childpid, 
-				  int pid, 
+		  int pid, 
                   int gid, 
-				  double min, 
-			      double max, 
-				  double elapsed,
-				  bool testType)
+		  double min, 
+	          double max, 
+		  double elapsed,
+		  bool testType)
 {
 	(childpid == 0)?printf("Child"):printf("Parent");
 	printf("'s Results for ");
@@ -203,12 +203,12 @@ int main(int argc, char **argv)
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
 		printResults(childpid, 
-					 getpid(), 
-					 getgid(), 
-					 minTime, 
-					 maxTime, 
-					 elapsedTime,
-					 false);
+			     getpid(), 
+			     getgid(), 
+			     minTime, 
+			     maxTime, 
+			     elapsedTime,
+			     false);
 		exit(0);	
 	}
 
@@ -258,12 +258,12 @@ int main(int argc, char **argv)
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec)/1000.0;   // us to ms
 		printResults(childpid,
-					 getpid(),
-					 getgid(),
-					 minTime,
-					 maxTime,
-					 elapsedTime,
-					 true);
+			     getpid(),
+			     getgid(),
+			     minTime,
+			     maxTime,
+			     elapsedTime,
+			     true);
 		exit(0);
 	}
 }
