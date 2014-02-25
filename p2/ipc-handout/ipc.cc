@@ -28,24 +28,18 @@ double elapsedTime = 0,
 	   rtTime = 0,
 	   minTime = 0,
 	   maxTime = 0;
-bool looping;
+bool looping = true;
 
 void sigusr1_handler(int sig) 
-{	
-	printf("      SIGUSR1 received by prc %d\n", getpid());
-	printf("         %d sending SIGUSR 2 to %d\n", getpid(), getppid());
-	kill(getppid(), SIGUSR2);
-}
+{}
 
 void sigusr2_handler(int sig) 
-{ 
-	printf("            SIGUSR2 received by prc %d\n", getpid());
-}
+{}
 
 void sigint_handler(int sig)
 {
-	printf("Proc %d received SIGINT from proc %d...quitting\n", getpid(), getppid());
 	looping = false;
+	// Exit(0) will happen after it prints
 }
 
 // printing helper routine
@@ -63,7 +57,8 @@ void printResults(int childpid,
 	printf("Round trip times\n");
 	printf("Average %f\n", total/numtests);
 	printf("Maximum %f\nMinimum %f\n", max, min);
-	printf("Elapsed Time %f\n", total);
+	printf("Elapsed Time %f\n", elapsed);
+	printf("rtTotal: %f\n", total);
 }
 
 //
@@ -109,7 +104,7 @@ int main(int argc, char **argv)
     
     printf("Number of Tests %d\n", numtests);
     // start timer
-	// gettimeofday(&t1, NULL); 
+	gettimeofday(&t1, NULL);
 	if(strcmp(argv[1],"-p")==0)
 	{
 		int currentTest = 0;
@@ -193,7 +188,6 @@ int main(int argc, char **argv)
 		exit(0);	
 	}
 
-
 	if(strcmp(argv[1],"-s")==0)
 	{
 		if ((childpid = fork()) == -1)
@@ -203,35 +197,73 @@ int main(int argc, char **argv)
 		}
 		if (childpid == 0)
 		{
+			sigset_t csigset;
+			sigaddset(&csigset, SIGUSR2);
+			sigsuspend(&csigset);
+			gettimeofday(&rt1, NULL);
+			printf("CHILD TIMER INITIALIZED\n");
+			kill(getppid(), SIGUSR2);
 			while (looping)
 			{
-				printf("child here\n");
+				sigsuspend(&csigset);
+				gettimeofday(&rt2, NULL);
+				printf("CHILD TIMER STOPPED\n");
+				rtTime = ((double)rt2.tv_sec - (double)rt1.tv_sec) * 1000.0;
+				rtTime += ((double)rt2.tv_usec - (double)rt2.tv_usec) / 1000.0;
+				//printf("                  RT time: %f\n", rtTime);
+				printf("                     [Test complete]\n");
+				rtTime += (rt2.tv_sec-rt1.tv_sec)*1000.0;
+				rtTime += (rt2.tv_usec-rt1.tv_usec)/1000.0;
+				if(rtTime > maxTime)
+					maxTime = rtTime;
+				if(rtTime < minTime || minTime == 0)
+					minTime = rtTime;
+				totalTripTime += rtTime;
+				printf("DeltaT: %f\n", rtTime);
+				printf("      Proc %d received signal\n", getpid());
+				gettimeofday(&rt1, NULL);
+				printf("Child timer restarted\n");
+				kill(getppid(), SIGUSR2);
 			}
+			printf("CHILD IS EXITING\n");
 		}
 		else
 		{
 			int currentTest = 0;
+			sigset_t psigset;
+			sigaddset(&psigset, SIGUSR1);
+			sigaddset(&psigset, SIGINT);
 			while (currentTest < numtests)
 			{
 				printf("Starting timer for proc: %d\n", getpid());
 				gettimeofday(&rt1, NULL);
 				printf("   Sending SIGUSR1 to child\n");
 				kill(childpid, SIGUSR1);
-				pause();
+				//pause(); // switch this to sigsuspend
+				sigsuspend(&psigset);
+				printf("         Proc %d received signal\n", getpid());
 				gettimeofday(&rt2, NULL);
 				printf("               Stopped timer for prc %d\n", getpid());
-				rtTime = (rt2.tv_sec - rt1.tv_sec) * 1000.0;
-				rtTime += (rt2.tv_usec - rt2.tv_usec) / 1000.0;
-				//printf("                  RT time: %f\n", (double)(rt2.tv_sec) - (double)(rt1.tv_sec));
-				printf("T2: %f\n", (double)rt2.tv_usec);
-				printf("T1: %f\n", (double)rt1.tv_usec);
+				rtTime = ((double)rt2.tv_sec - (double)rt1.tv_sec) * 1000.0;
+				rtTime += ((double)rt2.tv_usec - (double)rt2.tv_usec) / 1000.0;
+				//printf("                  RT time: %f\n", rtTime);
 				printf("                     [Test complete]\n");
+				rtTime += (rt2.tv_sec-rt1.tv_sec)*1000.0;
+				rtTime += (rt2.tv_usec-rt1.tv_usec)/1000.0;
+				if(rtTime > maxTime)
+					maxTime = rtTime;
+				if(rtTime < minTime || minTime == 0)
+					minTime = rtTime;
+				totalTripTime += rtTime;
+				printf("DeltaT: %f\n", rtTime);
+
 				currentTest++;
 			}			
 						
 			// When all is said and done...
 			kill(childpid, SIGINT);
 			wait(0);
+			printf("PARENT IS EXITING! :o\n");
 		}
 		//code for benchmarking signals over numtests		
 		// stop timer
@@ -240,6 +272,13 @@ int main(int argc, char **argv)
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
 		printf("Elapsed Time %f\n", elapsedTime);
+		printResults(childpid,
+					 getpid(),
+					 getgid(),
+					 minTime,
+					 maxTime,
+					 totalTripTime,
+					 elapsedTime);
 		exit(0);
 	}
 }
