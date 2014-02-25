@@ -24,17 +24,40 @@ pid_t   childpid;
 timeval t1, t2, rt1, rt2;
 int numtests;
 double elapsedTime = 0,
-	   totalTripTime = 0,
-	   rtTime = 0,
+	   totalTripTime,
+	   rtTime,
 	   minTime = 0,
 	   maxTime = 0;
 bool looping = true;
+sigset_t sigmask;
 
-void sigusr1_handler(int sig) 
-{}
+void sigusr1_handler(int sig) // Child catches this
+{
+	gettimeofday(&rt2, NULL);
+	rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
+	rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
+	totalTripTime += rtTime;
+    if(rtTime > maxTime)
+        maxTime = rtTime;
+    if(rtTime < minTime || minTime == 0)
+        minTime = rtTime;
+    gettimeofday(&rt1, NULL);
+    kill(getppid(), SIGUSR2);
+}
 
-void sigusr2_handler(int sig) 
-{}
+void sigusr2_handler(int sig) // Parent catches this
+{
+	gettimeofday(&rt2, NULL);
+	rtTime = (rt2.tv_sec - rt1.tv_sec)*1000.0;
+	rtTime += (rt2.tv_usec - rt1.tv_usec)/1000.0;
+	totalTripTime += rtTime;
+	if(rtTime > maxTime)
+		maxTime = rtTime;
+	if(rtTime < minTime || minTime == 0)
+		minTime = rtTime;
+	gettimeofday(&rt1, NULL);
+	kill(childpid, SIGUSR1);
+}
 
 void sigint_handler(int sig)
 {
@@ -48,17 +71,15 @@ void printResults(int childpid,
                   int gid, 
 				  double min, 
 			      double max, 
-                  double total,
 				  double elapsed)
 {
 	(childpid == 0)?printf("Child"):printf("Parent");
 	printf("'s Results for String IPC mechanisms\n");
 	printf("Process ID is %d, Group ID is %d\n", pid, gid);
 	printf("Round trip times\n");
-	printf("Average %f\n", total/numtests);
+	printf("Average %f\n", elapsed/numtests);
 	printf("Maximum %f\nMinimum %f\n", max, min);
 	printf("Elapsed Time %f\n", elapsed);
-	printf("rtTotal: %f\n", total);
 }
 
 //
@@ -177,19 +198,19 @@ int main(int argc, char **argv)
 		gettimeofday(&t2, NULL);
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
 		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-		char testType[] = "Signal";
 		printResults(childpid, 
 					 getpid(), 
 					 getgid(), 
 					 minTime, 
 					 maxTime, 
-					 totalTripTime, 
 					 elapsedTime);
 		exit(0);	
 	}
 
 	if(strcmp(argv[1],"-s")==0)
 	{
+		int currentTest = 0;
+		printf("Beginning signals test...\n");
 		if ((childpid = fork()) == -1)
 		{
 			perror("fork");
@@ -197,87 +218,44 @@ int main(int argc, char **argv)
 		}
 		if (childpid == 0)
 		{
-			sigset_t csigset;
-			sigaddset(&csigset, SIGUSR2);
-			sigsuspend(&csigset);
-			gettimeofday(&rt1, NULL);
-			printf("CHILD TIMER INITIALIZED\n");
-			kill(getppid(), SIGUSR2);
-			while (looping)
-			{
-				sigsuspend(&csigset);
-				gettimeofday(&rt2, NULL);
-				printf("CHILD TIMER STOPPED\n");
-				rtTime = ((double)rt2.tv_sec - (double)rt1.tv_sec) * 1000.0;
-				rtTime += ((double)rt2.tv_usec - (double)rt2.tv_usec) / 1000.0;
-				//printf("                  RT time: %f\n", rtTime);
-				printf("                     [Test complete]\n");
-				rtTime += (rt2.tv_sec-rt1.tv_sec)*1000.0;
-				rtTime += (rt2.tv_usec-rt1.tv_usec)/1000.0;
-				if(rtTime > maxTime)
-					maxTime = rtTime;
-				if(rtTime < minTime || minTime == 0)
-					minTime = rtTime;
-				totalTripTime += rtTime;
-				printf("DeltaT: %f\n", rtTime);
-				printf("      Proc %d received signal\n", getpid());
-				gettimeofday(&rt1, NULL);
-				printf("Child timer restarted\n");
-				kill(getppid(), SIGUSR2);
-			}
-			printf("CHILD IS EXITING\n");
+			sigaddset(&sigmask, SIGUSR2);
 		}
 		else
 		{
-			int currentTest = 0;
-			sigset_t psigset;
-			sigaddset(&psigset, SIGUSR1);
-			sigaddset(&psigset, SIGINT);
-			while (currentTest < numtests)
+			sigaddset(&sigmask, SIGUSR1);
+			sigaddset(&sigmask, SIGINT);
+		}
+		if(childpid == 0)
+		{
+			gettimeofday(&rt1, NULL);
+			while(looping)
 			{
-				printf("Starting timer for proc: %d\n", getpid());
-				gettimeofday(&rt1, NULL);
-				printf("   Sending SIGUSR1 to child\n");
-				kill(childpid, SIGUSR1);
-				//pause(); // switch this to sigsuspend
-				sigsuspend(&psigset);
-				printf("         Proc %d received signal\n", getpid());
-				gettimeofday(&rt2, NULL);
-				printf("               Stopped timer for prc %d\n", getpid());
-				rtTime = ((double)rt2.tv_sec - (double)rt1.tv_sec) * 1000.0;
-				rtTime += ((double)rt2.tv_usec - (double)rt2.tv_usec) / 1000.0;
-				//printf("                  RT time: %f\n", rtTime);
-				printf("                     [Test complete]\n");
-				rtTime += (rt2.tv_sec-rt1.tv_sec)*1000.0;
-				rtTime += (rt2.tv_usec-rt1.tv_usec)/1000.0;
-				if(rtTime > maxTime)
-					maxTime = rtTime;
-				if(rtTime < minTime || minTime == 0)
-					minTime = rtTime;
-				totalTripTime += rtTime;
-				printf("DeltaT: %f\n", rtTime);
-
+				sigsuspend(&sigmask);
+			}
+		}
+		else
+		{
+			gettimeofday(&rt1, NULL);
+			kill(childpid, SIGUSR1);
+			while(currentTest < numtests)
+			{
+				sigsuspend(&sigmask);
 				currentTest++;
-			}			
-						
-			// When all is said and done...
+			}
 			kill(childpid, SIGINT);
 			wait(0);
-			printf("PARENT IS EXITING! :o\n");
 		}
 		//code for benchmarking signals over numtests		
 		// stop timer
 		gettimeofday(&t2, NULL);
 		// compute and print the elapsed time in millisec
 		elapsedTime = (t2.tv_sec - t1.tv_sec) * 1000.0;      // sec to ms
-		elapsedTime += (t2.tv_usec - t1.tv_usec) / 1000.0;   // us to ms
-		printf("Elapsed Time %f\n", elapsedTime);
+		elapsedTime += (t2.tv_usec - t1.tv_usec)/1000.0;   // us to ms
 		printResults(childpid,
 					 getpid(),
 					 getgid(),
 					 minTime,
 					 maxTime,
-					 totalTripTime,
 					 elapsedTime);
 		exit(0);
 	}
