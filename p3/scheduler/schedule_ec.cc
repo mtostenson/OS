@@ -1,9 +1,6 @@
 #include "schedule_ec.h"
 #include <stdlib.h>
 
-//delete this crap
-#include <stdio.h>
-
 // Globals
 struct node* root;
 struct node* cur;
@@ -16,19 +13,6 @@ struct node
 	struct node* prev;
 };
 
-void print()
-{
-	if (root)
-	{
-		cur = root;
-		while (cur)
-		{
-			printf("[%d, %d] -> ", cur->value, cur->pri);
-			cur = cur->next;
-		}
-		printf("\n");
-	}
-}
 /*
  * Function to add a process to the scheduler
  * @Param tid - the ID for the process/thread to be added to the 
@@ -67,7 +51,6 @@ int addProcessEC(int tid, int priority)
 			cur->next = temp;
 		}
 	}
-	print();
 	return 1;
 }
 /*
