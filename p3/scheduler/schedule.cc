@@ -33,7 +33,9 @@ int addProcess(int tid)
 	{
 		cur = root;
 		while (cur->next)
+		{
 			cur = cur->next;
+		}
 		cur->next = (struct node*)malloc(sizeof(struct node));
 		cur->next->prev = cur;
 		cur = cur->next;
@@ -104,7 +106,9 @@ int nextProcess()
 		root = root->next;
 		root->prev = NULL;
 		while (cur->next)
+		{
 			cur = cur->next;
+		}
 		cur->next = temp;
 		temp->next = NULL;
 		temp->prev = cur;
