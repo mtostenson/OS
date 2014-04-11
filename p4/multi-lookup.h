@@ -1,7 +1,9 @@
+#include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include "util.h"
 #include "queue.h"
@@ -14,3 +16,5 @@
 #define INPUTFS "%1024s"
 
 queue q;
+int test = 10;
+pthread_t req_threads[THREAD_MAX];
