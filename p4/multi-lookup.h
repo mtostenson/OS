@@ -1,3 +1,10 @@
+/*
+* File: multi-lookup.c
+* Author: Michael Tostenson
+* Create Date: 04/09/2014
+* Update Date: 04/11/2014
+*/
+
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,7 +33,6 @@ pthread_mutex_t output_lock;
 FILE* outputfp;
 
 char firstipstr[INET6_ADDRSTRLEN];
-int run_req_threads;
 int rc;
 int i;
 

@@ -2,17 +2,20 @@
  * File: multi-lookup.c
  * Author: Michael Tostenson
  * Create Date: 04/09/2014
+ * Update Date: 04/11/2014
  */
 
 #include "multi-lookup.h"
 
+// Global queue
 queue q;
 
 int main(int argc, char* argv[])
 {
-	/* Checking arguments */
 	(void)argc;
 	(void)argv;
+
+	// Check command line arguments
 	if(argc < MINARGS)
 	{
         fprintf(stderr, "Not enough arguments: %d\n", (argc-1));
@@ -20,7 +23,7 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
 	}
 	
-	/* Setting up output file */
+	// Open file for writing output
 	outputfp = fopen(argv[argc-1], "w");
 	if(!outputfp)
 	{
@@ -28,11 +31,14 @@ int main(int argc, char* argv[])
 		return EXIT_FAILURE;
 	}
 
-	/* Initializing queue */
+	// Initializing queue
 	if(queue_init(&q, QUEUE_LENGTH) == QUEUE_FAILURE)
 		fprintf(stderr, "Queue initialization failed.\n");
 	
-	/* Setting up requester thread pool */
+	// Initialize queue mutex
+	pthread_mutex_init(&queue_lock, NULL);
+
+	// Set up requester thread pool
 	for(i = 0; i< argc-2; i++)
 	{
 		rc = pthread_create(&(req_threads[i]), NULL, Requester, argv[i+1]);
@@ -43,7 +49,10 @@ int main(int argc, char* argv[])
 		}
 	}
 	
-	/* Setting up resolver thread pool */
+	// Initialize output file mutex
+	pthread_mutex_init(&output_lock, NULL);
+
+	// Set up resolver thread pool
 	for(i = 0; i < NUM_THREADS; i++)
 	{
 		rc = pthread_create(&(res_threads[i]), NULL, Resolver, outputfp);
@@ -54,11 +63,11 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	/* Waiting for requester threads to finish */
+	// Wait for requester threads to finish
 	for(i = 0; i < NUM_THREADS; i++)
 		pthread_join(req_threads[i], NULL);
 
-	/* Waiting for resolver threads to finish */
+	// Wait for resolver threads to finish
 	for(i = 0; i < NUM_THREADS; i++)
 		pthread_join(res_threads[i], NULL);
 
@@ -82,29 +91,40 @@ void* Requester(void* filename)
 	{
 		new_string = malloc(MAX_NAME_LENGTH);
 		strncpy(new_string, hostname, MAX_NAME_LENGTH);
+		
+		// Wait if queue is full
 		while(queue_is_full(&q))
-		{
 			usleep((rand()%100)*10000+1000000);
-			fprintf(stdout, "Full queue\n");
-		}
+		
+		// Lock the queue while pushing
+		pthread_mutex_lock(&queue_lock);
 		queue_push(&q, new_string);
-		fprintf(stdout, "Pushed \"%s\"\n", new_string);
+		pthread_mutex_unlock(&queue_lock);
 	}
 	fclose(inputfp);
 	return EXIT_SUCCESS;
 }
 
-void* Resolver(void* arg)
+void* Resolver(void* outfile)
 {
-	(void)arg;
 	usleep(10000);
 	while(!queue_is_empty(&q))
 	{
+		// Lock the queue while popping
+		pthread_mutex_lock(&queue_lock);
 		char* hostname = queue_pop(&q);
+		pthread_mutex_unlock(&queue_lock);
 		if(hostname == NULL)
 			return EXIT_SUCCESS;
 		dnslookup(hostname, firstipstr, sizeof(firstipstr));
+		
+		// Write to stdout along with output file
 		fprintf(stdout, "%s %s\n", hostname, firstipstr);
+		
+		// Lock output file while writing
+		pthread_mutex_lock(&output_lock);
+		fprintf((FILE*)outfile, "%s %s\n", hostname, firstipstr);
+		pthread_mutex_unlock(&output_lock);
 	}
 	return EXIT_SUCCESS;
 }
