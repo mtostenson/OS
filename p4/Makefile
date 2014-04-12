@@ -36,12 +36,6 @@ util.o: util.c util.h
 pthread-hello.o: pthread-hello.c
 	$(CC) $(CFLAGS) $<
 
-min_thread: min_thread.o
-	$(CC) $(LFLAGS) $^ -o $@
-
-min_thread.o: min_thread.c
-	$(CC) $(CFLAGS)	$<
-
 clean:
 	rm -f lookup queueTest pthread-hello multi-lookup
 	rm -f *.o
