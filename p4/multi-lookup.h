@@ -13,20 +13,20 @@
 #define MAX_NAME_LENGTH 1025
 #define MAX_INPUT_FILES 10
 #define INPUTFS "%1024s"
-#define QUEUE_LENGTH 50
-#define THREAD_MAX 5
+#define QUEUE_LENGTH 10
+#define NUM_THREADS 5
 #define MINARGS 3
 
-pthread_t req_threads[MAX_INPUT_FILES];
-pthread_t res_threads[THREAD_MAX];
+pthread_t req_threads[NUM_THREADS];
+pthread_t res_threads[NUM_THREADS];
 
 pthread_mutex_t queue_lock;
 pthread_mutex_t output_lock;
 
 FILE* outputfp;
 
-queue q;
-int res_id[THREAD_MAX];
+char firstipstr[INET6_ADDRSTRLEN];
+int run_req_threads;
 int rc;
 int i;
 
