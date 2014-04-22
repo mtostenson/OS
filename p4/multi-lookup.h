@@ -1,9 +1,9 @@
 /*
-* File: multi-lookup.c
-* Author: Michael Tostenson
-* Create Date: 04/09/2014
-* Update Date: 04/11/2014
-*/
+ * File: multi-lookup.c
+ * Author: Michael Tostenson
+ * Create Date: 04/09/2014
+ * Update Date: 04/11/2014
+ */
 
 #include <pthread.h>
 #include <stdlib.h>

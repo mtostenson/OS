@@ -8,6 +8,7 @@
 #include "multi-lookup.h"
 
 // Global queue
+int running = 1;
 queue q;
 
 int main(int argc, char* argv[])
@@ -48,7 +49,7 @@ int main(int argc, char* argv[])
 			return EXIT_FAILURE;
 		}
 	}
-	
+
 	// Initialize output file mutex
 	pthread_mutex_init(&output_lock, NULL);
 
@@ -66,6 +67,8 @@ int main(int argc, char* argv[])
 	// Wait for requester threads to finish
 	for(i = 0; i < NUM_THREADS; i++)
 		pthread_join(req_threads[i], NULL);
+
+	running = 0;
 
 	// Wait for resolver threads to finish
 	for(i = 0; i < NUM_THREADS; i++)
@@ -96,7 +99,7 @@ void* Requester(void* filename)
 		while(queue_is_full(&q))
 			usleep((rand()%100)*10000+1000000);
 		
-		// Lock the queue while pushing
+		// Lock the queue for push
 		pthread_mutex_lock(&queue_lock);
 		queue_push(&q, new_string);
 		pthread_mutex_unlock(&queue_lock);
@@ -107,24 +110,31 @@ void* Requester(void* filename)
 
 void* Resolver(void* outfile)
 {
-	usleep(10000);
-	while(!queue_is_empty(&q))
+	while(running == 1 || !queue_is_empty(&q))
 	{
-		// Lock the queue while popping
-		pthread_mutex_lock(&queue_lock);
-		char* hostname = queue_pop(&q);
-		pthread_mutex_unlock(&queue_lock);
-		if(hostname == NULL)
-			return EXIT_SUCCESS;
-		dnslookup(hostname, firstipstr, sizeof(firstipstr));
-		
-		// Write to stdout along with output file
-		fprintf(stdout, "%s %s\n", hostname, firstipstr);
-		
-		// Lock output file while writing
-		pthread_mutex_lock(&output_lock);
-		fprintf((FILE*)outfile, "%s %s\n", hostname, firstipstr);
-		pthread_mutex_unlock(&output_lock);
+		if(!queue_is_empty(&q))
+		{
+			// Lock the queue for pop
+			pthread_mutex_lock(&queue_lock);
+			char* hostname = queue_pop(&q);
+			pthread_mutex_unlock(&queue_lock);
+			
+			// Lookup
+			if(hostname == NULL)
+				return EXIT_SUCCESS;
+		    if(dnslookup(hostname, firstipstr, sizeof(firstipstr)) == UTIL_FAILURE)
+		    {
+				fprintf(stderr, "dnslookup error: %s\n", hostname);
+				strncpy(firstipstr, "", sizeof(firstipstr));
+			}
+			
+			// Lock output file while writing
+			pthread_mutex_lock(&output_lock);
+			fprintf((FILE*)outfile, "%s %s\n", hostname, firstipstr);
+			pthread_mutex_unlock(&output_lock);
+		}
+		else
+			usleep((rand()%100)*10000+1000000);			
 	}
 	return EXIT_SUCCESS;
 }
